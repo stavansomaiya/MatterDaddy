@@ -1,0 +1,17 @@
+{
+  "host": "127.0.0.1",
+  "port": 8000,
+  "hold_frames": 8,
+  "cooldown_frames": 10,
+  "rearm_no_hand_frames": 6,
+  "min_confidence": 0.7,
+  "session_ttl_seconds": 600,
+  "max_sessions": 50,
+  "word_hold_frames": 5,
+  "word_cooldown_frames": 10,
+  "word_rearm_no_hand_frames": 6,
+  "word_window_ms": 1500,
+  "word_min_span_ms": 700,
+  "word_max_distance": 120.0,
+  "word_min_margin": 4.0
+}

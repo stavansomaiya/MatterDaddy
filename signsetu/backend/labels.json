@@ -1,0 +1,55 @@
+{
+  "_comment": "SINGLE SOURCE OF TRUTH for class labels. recognizer.py, server.py, the tests and the front end all check against this file. To add a class: add it here, add a rule in recognizer.py AND an entry in SIGNS in frontend/index.html (tests/test_contract.py fails if they drift apart).",
+  "model": {
+    "name": "rule-based hand geometry (NOT a trained ML model)",
+    "version": "1.0",
+    "input": "21 MediaPipe hand landmarks (x, y, z), one hand",
+    "output": "label, confidence, recognized"
+  },
+  "classes": [
+    "palm",
+    "fist",
+    "thumb",
+    "point",
+    "three",
+    "horns",
+    "ok",
+    "thumbdown",
+    "four",
+    "call",
+    "ell",
+    "pinky",
+    "peace"
+  ],
+  "sentinels": {
+    "UNKNOWN": "A hand is visible but the pose matches no supported class",
+    "NO_HAND": "No hand visible in the frame"
+  },
+  "words": [
+    "account",
+    "doctor",
+    "form",
+    "help",
+    "i",
+    "medicine",
+    "money",
+    "namaste",
+    "name",
+    "no",
+    "pain",
+    "please",
+    "thanks",
+    "wait",
+    "want",
+    "washroom",
+    "water",
+    "where",
+    "yes"
+  ],
+  "word_model": {
+    "name": "ISL word recogniser: nearest-neighbour on recorded 10-frame clips",
+    "file": "models/signsetu-isl-model.json",
+    "input": "1-2 hands x 21 MediaPipe landmarks over ~1.5 s",
+    "output": "label, confidence, recognized"
+  }
+}
