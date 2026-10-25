@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SignSetu – Indian Sign Language to speech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:wght@600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<style>
+:root{--bg:#F1F6F7;--panel:#fff;--ink:#10202A;--mute:#52636E;--line:#D3DEE3;--teal:#0B6E78;--hero:#0A3B42;--sig:#FFD23F;--coral:#C8431F;--ok:#1B8A4B;--r:18px;--sh:0 1px 2px rgba(16,32,42,.06),0 8px 24px rgba(16,32,42,.08)}
+@media (prefers-color-scheme:dark){:root{--bg:#0B1418;--panel:#14212A;--ink:#EAF1F4;--mute:#9BB0BA;--line:#2A3C46;--teal:#43B7C2;--hero:#0E2B31;--sh:0 8px 24px rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+html{font-size:100%}
+body{background:var(--bg) radial-gradient(circle at 100% 0,rgba(11,110,120,.08),transparent 40%) no-repeat;color:var(--ink);font:400 1.1rem/1.55 "Atkinson Hyperlegible",system-ui,sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque","Atkinson Hyperlegible",sans-serif;margin:0;line-height:1.1}
+button,select,textarea,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--sig);outline-offset:3px;box-shadow:0 0 0 6px var(--teal)}
+header{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;padding:12px clamp(16px,4vw,48px);background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;font:800 1.6rem "Bricolage Grotesque",sans-serif}
+.logo{width:40px;height:40px;border-radius:12px;background:var(--hero);display:grid;place-items:center;font-size:1.3rem}
+.brand small{display:block;font:400 .85rem "Atkinson Hyperlegible";color:var(--mute)}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:flex;background:var(--bg);border-radius:999px;padding:4px}
+.seg button{background:none;border:0;padding:8px 16px;cursor:pointer;min-height:44px;border-radius:999px;font-weight:700}
+.seg button[aria-pressed=true]{background:var(--teal);color:#fff;box-shadow:var(--sh)}
+.btn{background:var(--teal);color:#fff;border:0;border-radius:999px;padding:12px 26px;min-height:52px;cursor:pointer;font-weight:700;display:inline-flex;gap:8px;align-items:center;justify-content:center;transition:transform .12s}
+.btn:not(.ghost){box-shadow:0 6px 16px rgba(11,110,120,.3)}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn.ghost{background:var(--panel);color:var(--ink);border:2px solid var(--line)}
+.btn.sm{min-height:44px;padding:8px 18px}
+.btn.rec{background:var(--coral)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.hero{position:relative;overflow:hidden;background:var(--hero) radial-gradient(rgba(255,255,255,.09) 1.4px,transparent 1.6px) 0 0/22px 22px;color:#fff;padding:clamp(24px,4vw,48px) clamp(16px,4vw,48px) 72px}
+.hero::after{content:"";position:absolute;right:-120px;top:-140px;width:420px;height:420px;border-radius:50%;background:var(--teal);opacity:.35}
+.hero .in{position:relative;z-index:1;max-width:1240px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);align-items:center;gap:22px 40px}
+@media (max-width:900px){.hero .in{grid-template-columns:1fr}.demo{display:none}}
+.hero .copy{display:grid;gap:18px}
+.hero h1{font-size:clamp(2.2rem,5vw,3.6rem);max-width:16ch;letter-spacing:-.02em}
+.hero p{margin:0;color:#BFD6DB;max-width:56ch}
+.demo{display:grid;gap:12px;transform:rotate(1.5deg)}
+.bub{border-radius:20px;padding:14px 20px;max-width:92%;font:800 1.4rem/1.15 "Bricolage Grotesque",sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.28)}
+.bub small{display:block;font:400 .8rem "Atkinson Hyperlegible";opacity:.75;margin-bottom:4px}
+.bub.a{background:var(--sig);color:#10202A;border-bottom-left-radius:4px}
+.bub.b{background:#fff;color:#10202A;margin-left:auto;border-bottom-right-radius:4px;font-size:1.2rem}
+.steps{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;list-style:none;margin:0;padding:0}
+@media (max-width:720px){.steps{grid-template-columns:1fr}}
+.steps li{display:flex;gap:12px;align-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 16px}
+.steps b{flex:none;width:32px;height:32px;border-radius:50%;background:var(--sig);color:#10202A;display:grid;place-items:center}
+main{padding:0 clamp(16px,4vw,48px) 48px;display:grid;gap:24px;max-width:1336px;margin:-48px auto 0;grid-template-columns:minmax(0,1fr) 360px;align-items:start}
+main>*{grid-column:1}
+main>.dict{grid-column:2;grid-row:1/span 5;position:sticky;top:84px;max-height:calc(100vh - 104px);display:flex;flex-direction:column;padding:16px}
+@media (max-width:1100px){main{grid-template-columns:1fr}main>.dict{grid-column:1;grid-row:auto;position:static;max-height:560px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:clamp(14px,2vw,22px);box-shadow:var(--sh)}
+.scen{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-radius:999px;padding:10px 14px 10px 24px}
+.scen>span{font-weight:700;margin-right:6px}
+.chip{border:2px solid var(--line);background:var(--bg);border-radius:999px;padding:8px 20px;min-height:48px;cursor:pointer;font-weight:700;transition:transform .12s}
+.chip:hover{transform:translateY(-1px)}
+.chip[aria-pressed=true]{border-color:var(--teal);background:var(--teal);color:#fff;box-shadow:0 6px 16px rgba(11,110,120,.35)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:24px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+h2{font-size:1.3rem;margin-bottom:6px}
+.top h2{font-size:1.25rem;margin:0}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;font-weight:700;background:var(--bg);border-radius:999px;padding:4px 12px}
+.pill i{width:10px;height:10px;border-radius:50%;background:var(--mute)}
+.pill.on i{background:var(--ok);box-shadow:0 0 0 4px rgba(27,138,75,.25)}
+.cam{position:relative;aspect-ratio:4/3;background:#0A1216;border-radius:18px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.cam video,.cam canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.ph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:#BFD0D8}
+.ph span{font-size:3rem;display:block}
+.badge{position:absolute;left:12px;bottom:16px;background:rgba(0,0,0,.72);color:#fff;padding:4px 14px;border-radius:999px;font-size:.95rem;z-index:3}
+.hold{position:absolute;left:0;bottom:0;height:6px;width:0;background:var(--sig);transition:width .1s;z-index:3}
+.cd{position:absolute;inset:0;z-index:4;display:grid;place-items:center;font:800 8rem "Bricolage Grotesque",sans-serif;color:#fff;text-shadow:0 4px 30px rgba(0,0,0,.6);background:rgba(0,0,0,.28)}
+.rb{position:absolute;left:12px;top:12px;z-index:4;background:var(--coral);color:#fff;border-radius:999px;padding:4px 14px;font-weight:700}
+.vf i{position:absolute;width:34px;height:34px;border:4px solid var(--sig);z-index:2;pointer-events:none}
+.vf i:nth-child(1){left:14px;top:14px;border-right:0;border-bottom:0;border-top-left-radius:12px}
+.vf i:nth-child(2){right:14px;top:14px;border-left:0;border-bottom:0;border-top-right-radius:12px}
+.vf i:nth-child(3){left:14px;bottom:14px;border-right:0;border-top:0;border-bottom-left-radius:12px}
+.vf i:nth-child(4){right:14px;bottom:14px;border-left:0;border-top:0;border-bottom-right-radius:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:center}
+.note{color:var(--mute);font-size:.95rem;margin:0}
+.err{color:var(--coral);font-weight:700}
+.display{background:#0A1216 radial-gradient(rgba(255,210,63,.07) 1.2px,transparent 1.4px) 0 0/20px 20px;border-radius:28px;padding:clamp(22px,3vw,40px);min-height:300px;display:flex;flex-direction:column;justify-content:space-between;gap:20px;position:relative;overflow:hidden;box-shadow:var(--sh)}
+.display::before{content:"“";position:absolute;right:20px;top:-30px;font:800 11rem/1 "Bricolage Grotesque";color:rgba(255,210,63,.1)}
+.lbl{color:#9BB0BA;font-size:1rem}
+.lblrow{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.txt{color:var(--sig);font:800 clamp(2.2rem,5.5vw,4.2rem)/1.06 "Bricolage Grotesque",sans-serif;word-break:break-word;text-shadow:0 0 30px rgba(255,210,63,.25)}
+.hi{color:#EAF1F4;font-size:clamp(1.2rem,2.4vw,1.8rem)}
+.conf{height:10px;background:#22343D;border-radius:99px;overflow:hidden;margin-top:14px}
+.conf i{display:block;height:100%;width:0;background:var(--sig);transition:width .2s}
+.wave{display:flex;gap:3px;align-items:center;height:20px;opacity:.25}
+.wave b{width:4px;height:6px;background:var(--sig);border-radius:2px}
+.speaking .wave{opacity:1}
+.speaking .wave b{animation:w .7s ease-in-out infinite alternate}
+.wave b:nth-child(2){animation-delay:.12s!important}.wave b:nth-child(3){animation-delay:.24s!important}.wave b:nth-child(4){animation-delay:.36s!important}.wave b:nth-child(5){animation-delay:.18s!important}
+@keyframes w{to{height:20px}}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+textarea{width:100%;min-height:96px;margin-top:8px;border:2px solid var(--line);background:var(--bg);border-radius:16px;padding:12px;resize:vertical}
+.staff{background:var(--hero) radial-gradient(rgba(255,255,255,.07) 1.2px,transparent 1.4px) 0 0/18px 18px;color:#fff;border-radius:20px;border-bottom-right-radius:6px;padding:20px;margin-top:14px;font:700 clamp(1.6rem,3.6vw,2.6rem)/1.15 "Bricolage Grotesque",sans-serif;min-height:96px}
+.staff:empty::before{content:"…";color:#9FBBC2}
+
+/* sign to sentence */
+.conv{display:grid;gap:18px}
+.flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,2fr);gap:16px;align-items:stretch}
+@media (max-width:760px){.flow{grid-template-columns:1fr}.flow .arr{transform:rotate(90deg);justify-self:center}}
+.fs{background:var(--bg);border:2px dashed var(--line);border-radius:20px;padding:16px;text-align:center;display:grid;gap:4px;align-content:center;min-height:130px}
+.fs .big{font-size:3.2rem;line-height:1}
+.fs b{font-size:1rem}
+.fs.hot{border-style:solid;border-color:var(--sig);background:color-mix(in srgb,var(--sig) 18%,var(--bg))}
+.arr{align-self:center;font-size:2rem;color:var(--teal);font-weight:800}
+.ft{background:#0A1216;color:var(--sig);border-radius:20px;padding:18px 22px;display:grid;align-content:center;font:800 clamp(1.5rem,3.2vw,2.4rem)/1.12 "Bricolage Grotesque",sans-serif;min-height:130px}
+.ft small{display:block;font:400 .85rem "Atkinson Hyperlegible";color:#9BB0BA;margin-bottom:4px}
+.tr{background:var(--bg);border-radius:16px;padding:12px 14px;min-height:76px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
+.tr .mute{color:var(--mute);font-size:1rem;padding:6px 4px}
+.wd{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:4px 14px;font:800 1.25rem "Bricolage Grotesque",sans-serif}
+.wd.cur{border-color:var(--sig);background:color-mix(in srgb,var(--sig) 40%,var(--panel))}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:.95rem;min-height:44px}
+.chk input{width:22px;height:22px;accent-color:var(--teal)}
+
+/* text to speech */
+.tts{display:grid;gap:14px;position:relative}
+.ttsg{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px}
+@media (max-width:860px){.ttsg{grid-template-columns:1fr}}
+.qp{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.qp button{border:2px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 14px;min-height:40px;cursor:pointer;font-size:.95rem}
+.qp button:hover{border-color:var(--teal)}
+.opts{display:grid;gap:14px;align-content:start;background:var(--bg);border-radius:18px;padding:16px}
+.opts label{display:grid;gap:6px;font-weight:700;font-size:.95rem}
+.opts output{float:right;color:var(--mute);font-weight:400}
+.opts select{width:100%;min-height:46px;border:2px solid var(--line);border-radius:12px;background:var(--panel);padding:6px 10px}
+.opts input[type=range]{width:100%;accent-color:var(--teal);min-height:32px}
+.status{display:flex;align-items:center;gap:12px;background:var(--hero);color:#fff;border-radius:14px;padding:10px 16px}
+.status .wave{opacity:.3}
+.tts.speaking .wave{opacity:1}
+.tts.speaking .wave b{animation:w .7s ease-in-out infinite alternate}
+.tts.speaking .status{outline:3px solid var(--sig)}
+.vgs{display:grid;gap:10px;margin-top:4px}
+.vgs h3{font-size:1.05rem;margin:8px 0 2px}
+.vg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.vc{border:2px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:8px;background:var(--bg)}
+.vc.sel{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 12%,var(--bg))}
+.vc b{font-size:.95rem;line-height:1.25;word-break:break-word}
+.vc small{color:var(--mute)}
+.vc .r{display:flex;gap:8px}
+.vc button{flex:1;min-height:42px;border-radius:999px;border:2px solid var(--line);background:var(--panel);cursor:pointer;font-weight:700}
+.vc button.u{background:var(--teal);color:#fff;border-color:var(--teal)}
+
+/* teach */
+.tw{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center;background:var(--bg);border-radius:18px;padding:14px 18px;margin-top:12px}
+.twn{font:800 2rem/1.1 "Bricolage Grotesque",sans-serif}
+.dots{display:flex;gap:6px;margin-bottom:4px}
+.dots i{width:14px;height:14px;border-radius:50%;background:var(--line)}
+.dots i.f{background:var(--ok)}
+.lnk{color:var(--teal);font-weight:700;text-decoration:underline;padding:10px 4px;min-height:44px;display:inline-flex;align-items:center}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0 0}
+
+/* dictionary sidebar */
+.dict .dh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+.dict .dh h2{margin:0;font-size:1.2rem}
+.dict .sc{font-size:.85rem;font-weight:700;background:var(--teal);color:#fff;border-radius:999px;padding:3px 12px}
+#dq{width:100%;min-height:46px;margin:10px 0;border:2px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 16px}
+#dict{display:grid;gap:8px;overflow:auto;padding:2px 4px 4px 2px}
+.dr{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:var(--bg);border:2px solid transparent;border-radius:16px;padding:8px 12px 8px 8px;cursor:pointer;transition:border-color .12s,background .12s}
+.dr:hover{border-color:var(--teal)}
+.dr .e{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:1.5rem;background:var(--panel)}
+.dr .t{display:grid;min-width:0}
+.dr .m{font:800 1.08rem/1.2 "Bricolage Grotesque","Atkinson Hyperlegible",sans-serif}
+.dr small{color:var(--mute);font-size:.85rem}
+.dr .st{margin-left:auto;font-size:.85rem;color:var(--mute);font-weight:700}
+.dr .st.ok{color:var(--ok)}
+.dr .st.sr{color:#B07A00}
+.dr.sel{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 14%,var(--bg))}
+.dr.on{border-color:var(--sig);background:color-mix(in srgb,var(--sig) 24%,var(--bg))}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.speaking .wave b,.tts.speaking .wave b{animation:none;height:14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo" aria-hidden="true">🤟</div><div>SignSetu<small>सेतु · a bridge between sign and speech</small></div></div>
+  <div class="ctrls">
+    <div class="seg" role="group" aria-label="Spoken language">
+      <button type="button" id="lEn" aria-pressed="true">English</button>
+      <button type="button" id="lHi" aria-pressed="false">हिन्दी</button>
+    </div>
+    <button type="button" class="btn ghost sm" id="spk" aria-pressed="true">🔊 Voice on</button>
+    <button type="button" class="btn ghost sm" id="big" aria-pressed="false" data-t="big">A+ Text</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="in">
+    <div class="copy"><h1 data-t="hero_h">Indian Sign Language, spoken aloud.</h1>
+    <p data-t="hero_p"></p></div>
+    <div class="demo" aria-hidden="true"><div class="bub a"><small>Signer (ISL words)</small>DOCTOR · I · WANT</div><div class="bub b"><small>Speech</small>Doctor. I. Want.</div></div>
+    <ol class="steps">
+      <li><b>1</b><span data-t="st1"></span></li>
+      <li><b>2</b><span data-t="st2"></span></li>
+      <li><b>3</b><span data-t="st3"></span></li>
+    </ol>
+  </div>
+</section>
+
+<main>
+  <div class="card scen" role="group" aria-label="Where are you">
+    <span data-t="where"></span>
+    <button type="button" class="chip" data-s="hospital" aria-pressed="true" data-t="hosp"></button>
+    <button type="button" class="chip" data-s="bank" aria-pressed="false" data-t="bank"></button>
+    <button type="button" class="chip" data-s="office" aria-pressed="false" data-t="off"></button>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="Camera">
+      <div class="top"><h2 data-t="cam"></h2><span class="pill" id="pill"><i></i><span id="pt">Off</span></span></div>
+      <div class="cam" id="cam">
+        <video id="v" playsinline muted></video>
+        <canvas id="c"></canvas>
+        <div class="ph" id="ph"><div><span>📷</span><span style="font-size:1.1rem" data-t="ph"></span></div></div>
+        <div class="badge" id="badge" hidden>–</div>
+        <div class="vf"><i></i><i></i><i></i><i></i></div><div class="hold" id="hold"></div>
+        <div class="cd" id="cd" hidden></div>
+        <div class="rb" id="rb" hidden>● REC</div>
+      </div>
+      <div class="row">
+        <button type="button" class="btn" id="go" data-t="go"></button>
+        <button type="button" class="btn ghost" id="stop" data-t="stop" disabled></button>
+      </div>
+      <p class="note" id="msg" role="status" style="margin-top:10px"></p>
+    </section>
+
+    <section aria-label="Translation">
+      <div class="display" id="disp" aria-live="polite">
+        <div>
+          <div class="lblrow"><div class="lbl" data-t="says"></div><span class="wave" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b></span></div>
+          <div class="txt" id="txt"></div>
+        </div>
+        <div>
+          <div class="hi" id="hi"></div>
+          <div class="conf" aria-hidden="true"><i id="conf"></i></div>
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" class="btn" id="say" data-t="again"></button>
+        <button type="button" class="btn ghost" id="clr" data-t="clr"></button>
+      </div>
+    </section>
+  </div>
+
+  <section class="card conv" aria-label="Signs to sentence">
+    <div class="top"><h2 data-t="sent_h"></h2><span class="note" data-t="sent_n"></span></div>
+    <div class="flow">
+      <div class="fs" id="fs"><div class="big" id="fe">✋</div><b id="fn"></b></div>
+      <div class="arr" aria-hidden="true">→</div>
+      <div class="ft" aria-live="polite"><small data-t="conv"></small><span id="ftx">…</span></div>
+    </div>
+    <div class="tr" id="tr" aria-live="polite"></div>
+        <div class="seg" role="group" aria-label="Speech mode" style="justify-self:start">
+      <button type="button" id="mS" aria-pressed="true" data-t="mode_s"></button>
+      <button type="button" id="mW" aria-pressed="false" data-t="mode_w"></button>
+    </div>
+    <div class="row" style="margin-top:0">
+      <button type="button" class="btn" id="spS" data-t="spk_s"></button>
+      <button type="button" class="btn ghost sm" id="undo" data-t="undo"></button>
+      <button type="button" class="btn ghost sm" id="cp" data-t="cp"></button>
+      <button type="button" class="btn ghost sm" id="trc" data-t="trc"></button>
+    </div>
+  </section>
+
+  <section class="card tts" id="ttsCard" aria-label="Text to speech">
+    <div class="top"><h2 data-t="tts_h"></h2><span class="note" data-t="tts_n"></span></div>
+    <div class="ttsg">
+      <div>
+        <label for="ttsIn" class="note" data-t="tts_lbl"></label>
+        <textarea id="ttsIn" placeholder="Please take a seat. The doctor will call you soon."></textarea>
+        <div class="qp" id="qp" aria-label="Quick phrases"></div>
+        <div class="row">
+          <button type="button" class="btn" id="tSay" data-t="tSay"></button>
+          <button type="button" class="btn" id="tHi">🇮🇳 हिन्दी में बोलें</button>
+          <button type="button" class="btn" id="tEn">Speak in English</button>
+          <button type="button" class="btn ghost" id="tPause" data-t="pause"></button>
+          <button type="button" class="btn ghost" id="tStop" data-t="stop"></button>
+          <button type="button" class="btn ghost" id="tTr" data-t="tTr"></button>
+          <button type="button" class="btn ghost" id="tMic">🎤 Dictate / बोलकर लिखें</button>
+        </div>
+      </div>
+      <div class="opts">
+        <div><div class="note" style="font-weight:700;margin-bottom:6px">Voice style</div>
+          <div class="qp" id="vs" style="margin-top:0"><button type="button" data-r="1" data-p="1">Standard</button><button type="button" data-r="0.8" data-p="0.85">Calm</button><button type="button" data-r="1" data-p="1.35">Bright</button><button type="button" data-r="1.3" data-p="1">Quick</button><button type="button" data-r="0.7" data-p="0.7">Deep and slow</button></div></div>
+        <label><span data-t="voiceL"></span><select id="tVoice"><option value="">Auto (English or Hindi)</option></select></label>
+        <label><span><span data-t="speedL"></span><output id="rO">1.0×</output></span><input type="range" id="tRate" min="0.5" max="1.5" step="0.1" value="1"></label>
+        <label><span><span data-t="pitchL"></span><output id="pO">1.0</output></span><input type="range" id="tPitch" min="0.5" max="1.5" step="0.1" value="1"></label>
+        <p class="note" id="vNote"></p>
+        <div class="status" aria-live="polite"><span class="wave" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b></span><span id="tSt">Ready</span></div>
+      </div>
+    </div>
+    <div class="vgs" aria-label="Voices on this device">
+      <h2 style="margin:6px 0 0">Choose a voice · आवाज़ चुनें</h2>
+      <p class="note">Voices come from your device. Preview one, then press Use. Hindi and English each keep their own voice.</p>
+      <h3>हिन्दी</h3><div class="vg" id="vgHi"></div>
+      <h3>English</h3><div class="vg" id="vgEn"></div>
+    </div>
+  </section>
+
+  <div class="two">
+    <section class="card" id="teach" aria-label="Teach a sign">
+      <h2 data-t="teach_h"></h2>
+      <p class="note" data-t="teach_p"></p>
+      <div class="tw">
+        <div><div class="twn" id="twn"></div><div class="note" id="twm"></div></div>
+        <div><div class="dots" id="dots" aria-hidden="true"></div><div class="note" id="tws"></div></div>
+      </div>
+      <div class="row">
+        <button type="button" class="btn rec" id="rec" data-t="rec"></button>
+        <button type="button" class="btn ghost" id="tryw" data-t="test"></button>
+        <button type="button" class="btn ghost" id="delw" data-t="del"></button>
+      </div>
+      <div class="row">
+        <button type="button" class="btn ghost sm" id="pw" data-t="prev"></button>
+        <button type="button" class="btn ghost sm" id="nw" data-t="next"></button>
+        <label class="chk"><input type="checkbox" id="auto" checked><span data-t="auto"></span></label>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <a class="lnk" href="https://islrtc.nic.in/" target="_blank" rel="noopener" data-t="linkd"></a>
+        <a class="lnk" href="https://ciet.ncert.gov.in/sign" target="_blank" rel="noopener" data-t="linkn"></a>
+      </div>
+      <hr>
+      <div class="row">
+        <button type="button" class="btn ghost sm" id="exp" data-t="exp"></button>
+        <button type="button" class="btn ghost sm" id="imp" data-t="imp"></button>
+        <input type="file" id="impf" accept=".json,application/json" hidden>
+        <button type="button" class="btn ghost sm" id="rst" data-t="rst"></button>
+      </div>
+      <p class="note" id="mstat" style="margin-top:10px"></p>
+    </section>
+    <section class="card">
+      <h2 data-t="reply_h"></h2>
+      <label for="reply" class="note" data-t="reply_lbl"></label>
+      <textarea id="reply" placeholder="Please wait, the doctor will see you soon."></textarea>
+      <div class="row">
+        <button type="button" class="btn" id="show" data-t="show"></button>
+        <button type="button" class="btn ghost" id="mic" data-t="mic"></button>
+      </div>
+      <div class="staff" id="staff" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <aside class="card dict" aria-label="ISL word list">
+    <div class="dh"><h2 data-t="dict_h"></h2><span class="sc" id="dsc"></span></div>
+    <p class="note" data-t="dict_n"></p>
+    <input type="search" id="dq" data-tp="dq" aria-label="Search words">
+    <div id="dict"></div>
+  </aside>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+
+/* =====================================================================
+   CORE: turns hand landmarks into a short motion sequence and matches it
+   against signs recorded from the ISLRTC dictionary (k-nearest-neighbour).
+   Works for still hand shapes, moving signs and two-handed signs.
+   ===================================================================== */
+/* CORE_START */
+const NF=10,D=92,WIN=1600,CAP=2400;       // frames per sequence, values per frame, window ms, capture ms
+let buf=[],DB=[],TOL={};
+const clip=(x,a,b)=>Math.max(a,Math.min(b,x));
+function frameVec(hs){                      // hs: 1 or 2 hands, sorted left to right in the image
+  const v=new Float32Array(D),a=hs[0],b=hs[1];
+  const put=(lm,off)=>{const w=lm[0],s=Math.hypot(lm[9].x-w.x,lm[9].y-w.y)||1e-3;for(let i=0;i<21;i++){v[2+off+2*i]=(lm[i].x-w.x)/s;v[3+off+2*i]=(lm[i].y-w.y)/s}return s};
+  v[0]=1.5;const s0=put(a,0);v[86]=a[0].x*2;v[87]=a[0].y*2;
+  if(b){v[1]=1.5;put(b,42);v[88]=b[0].x*2;v[89]=b[0].y*2;v[90]=clip((b[0].x-a[0].x)/s0,-6,6)*.5;v[91]=clip((b[0].y-a[0].y)/s0,-6,6)*.5}
+  return v;
+}
+function pushFrame(hs,t){
+  if(buf.length&&t-buf[buf.length-1].t>600)buf=[];
+  const w=hs[0][0],s=Math.hypot(hs[0][9].x-w.x,hs[0][9].y-w.y)||1e-3;
+  buf.push({t,v:frameVec(hs),x:w.x,y:w.y,s});
+  while(buf.length&&buf[0].t<t-3500)buf.shift();
+}
+function seqAt(end,win){                    // resample the window ending at `end` to NF frames
+  if(!buf.length)return null;
+  const out=new Float32Array(NF*D);let j=0;
+  for(let i=0;i<NF;i++){
+    const ts=end-win+i*win/(NF-1);
+    while(j+1<buf.length&&Math.abs(buf[j+1].t-ts)<=Math.abs(buf[j].t-ts))j++;
+    out.set(buf[j].v,i*D);
+  }
+  return out;
+}
+function rms(a,b){let s=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];s+=d*d}return Math.sqrt(s/a.length)}
+const recIds=l=>new Set(DB.filter(x=>x.l===l).map(x=>x.r));
+function calcTol(){                         // how loose a match may be, learned from the spread of each word's recordings
+  TOL={};const by={};
+  DB.forEach(x=>(by[x.l]=by[x.l]||[]).push(x));
+  for(const l in by){
+    const arr=by[l];
+    if(new Set(arr.map(x=>x.r)).size<2){TOL[l]=.2;continue}
+    let tot=0,n=0;
+    for(const x of arr){let m=Infinity;for(const y of arr)if(y.r!==x.r){const d=rms(x.d,y.d);if(d<m)m=d}if(m<Infinity){tot+=m;n++}}
+    TOL[l]=clip((tot/n)*2.2,.16,.5);
+  }
+}
+function classify(q){
+  if(!q||!DB.length)return null;
+  const best={};
+  for(const x of DB){const d=rms(q,x.d);if(best[x.l]===undefined||d<best[x.l])best[x.l]=d}
+  const L=Object.entries(best).sort((a,b)=>a[1]-b[1]);
+  const l=L[0][0],d1=L[0][1],d2=L[1]?L[1][1]:Infinity,tol=TOL[l]||.2;
+  return{l,d1,d2,ok:d1<=tol&&d1<=.9*d2,conf:clip(1-d1/(tol*1.3),0,1)};
+}
+/* CORE_END */
+
+/* ---------- Vocabulary: everyday, hospital, bank and office words from the ISLRTC dictionary ---------- */
+const CAT={g:["💬","Everyday","रोज़मर्रा"],n:["🔢","Numbers","संख्याएँ"],h:["🏥","Hospital","अस्पताल"],b:["🏦","Bank","बैंक"],o:["🏢","Office","दफ़्तर"]};
+const W=[
+["namaste","g","Hello","नमस्ते"],
+["thanks","g","Thank you","धन्यवाद"],
+["please","g","Please","कृपया"],
+["yes","g","Yes","हाँ"],
+["no","g","No","नहीं"],
+["help","g","Help","मदद"],
+["i","g","I","मैं"],
+["want","g","Want","चाहिए"],
+["where","g","Where","कहाँ"],
+["wait","g","Wait","रुकिए"],
+["water","g","Water","पानी"],
+["washroom","g","Washroom","शौचालय"],
+["name","g","Name","नाम"],
+["doctor","h","Doctor","डॉक्टर"],
+["pain","h","Pain","दर्द"],
+["medicine","h","Medicine","दवाई"],
+["emergency","h","Emergency","आपातकाल"],
+["money","b","Money","पैसे"],
+["account","b","Account","खाता"],
+["form","o","Form","फ़ॉर्म"]
+];
+const WI={};W.forEach(a=>WI[a[0]]={id:a[0],cat:a[1],en:a[2],hi:a[3]});
+const SC={hospital:"h",bank:"b",office:"o"};
+const SCN={hospital:["Hospital","अस्पताल"],bank:["Bank","बैंक"],office:["Office","दफ़्तर"]};
+/* Starter rules only: finger-counting numbers 1-5. They switch off for a number as soon as you record it. */
+const STARTER=new Set();
+
+/* ---------- Interface text ---------- */
+const S={
+hero_h:["Indian Sign Language, spoken aloud.","भारतीय सांकेतिक भाषा, आवाज़ में।"],
+hero_p:["For hospital, bank and office counters. SignSetu reads signs from the ISLRTC dictionary, shows each word in big text and speaks the sentence.","अस्पताल, बैंक और दफ़्तर के काउंटर के लिए। SignSetu ISLRTC शब्दकोश के इशारे पढ़ता है, हर शब्द बड़े अक्षरों में दिखाता है और वाक्य बोलकर सुनाता है।"],
+st1:["Choose where you are","चुनें कि आप कहाँ हैं"],st2:["Start the camera","कैमरा चालू करें"],st3:["Sign one word at a time","एक बार में एक शब्द का इशारा करें"],
+where:["Where are you?","आप कहाँ हैं?"],hosp:["🏥 Hospital","🏥 अस्पताल"],bank:["🏦 Bank","🏦 बैंक"],off:["🏢 Office","🏢 दफ़्तर"],
+cam:["Camera","कैमरा"],go:["▶ Start camera","▶ कैमरा चालू करें"],stop:["Stop","बंद करें"],ph:["Press “Start camera”. Video stays on this device.","“कैमरा चालू करें” दबाएँ। वीडियो इसी डिवाइस पर रहता है।"],
+says:["Signer says","इशारा करने वाला कहता है"],again:["🔊 Speak again","🔊 फिर से बोलें"],clr:["Clear","साफ़ करें"],wait:["Waiting for a sign…","इशारे की प्रतीक्षा…"],
+sent_h:["Signs to sentence","इशारों से वाक्य"],
+sent_n:["Each recognised ISL sign becomes a word. Words stay in the order signed; ISL word order differs from English.","हर पहचाना गया ISL इशारा एक शब्द बनता है। शब्द उसी क्रम में रहते हैं जिसमें इशारे किए गए; ISL में शब्द-क्रम अंग्रेज़ी से अलग है।"],
+conv:["Converted text","बदला हुआ टेक्स्ट"],nosign:["No sign yet","अभी कोई इशारा नहीं"],
+mode_w:["Speak each word","हर शब्द बोलें"],mode_s:["Speak whole sentence","पूरा वाक्य बोलें"],
+spk_s:["🔊 Speak sentence","🔊 वाक्य बोलें"],undo:["Undo last word","आख़िरी शब्द हटाएँ"],cp:["Copy text","टेक्स्ट कॉपी करें"],cpd:["Copied","कॉपी हो गया"],trc:["Clear sentence","वाक्य साफ़ करें"],
+tr_empty:["Signed words collect here.","इशारे से पहचाने शब्द यहाँ जमा होंगे।"],
+tts_h:["Text to speech","टेक्स्ट से आवाज़"],tts_n:["Type anything, or use a quick phrase. SignSetu reads it aloud.","कुछ भी लिखें या तैयार वाक्य चुनें। SignSetu उसे बोलकर सुनाएगा।"],tts_lbl:["Text to speak","बोलने के लिए टेक्स्ट"],
+tSay:["▶ Speak","▶ बोलें"],tTr:["Speak sentence from signs","इशारों वाला वाक्य बोलें"],pause:["Pause","रोकें"],resume:["Resume","फिर चलाएँ"],
+voiceL:["Voice","आवाज़"],speedL:["Speed","रफ़्तार"],pitchL:["Pitch","पिच"],
+teach_h:["Teach SignSetu an ISL sign","SignSetu को ISL इशारा सिखाएँ"],
+teach_p:["SignSetu learns each sign from a signer. Watch the word in the ISLRTC dictionary, press Record, then sign it exactly the same way. Record each word 3 to 5 times, with different people if you can.","SignSetu हर इशारा किसी इशारा करने वाले से सीखता है। ISLRTC शब्दकोश में शब्द देखें, रिकॉर्ड दबाएँ और वही इशारा करें। हर शब्द 3 से 5 बार रिकॉर्ड करें, हो सके तो अलग-अलग लोगों से।"],
+rec:["● Record sign","● इशारा रिकॉर्ड करें"],test:["🔊 Test word","🔊 शब्द जाँचें"],del:["Delete recordings","रिकॉर्डिंग हटाएँ"],
+prev:["← Previous","← पिछला"],next:["Next →","अगला →"],auto:["Move to the next word after 3 recordings","3 रिकॉर्डिंग के बाद अगले शब्द पर जाएँ"],
+exp:["Export","निर्यात"],imp:["Import","आयात"],rst:["Reset all","सब हटाएँ"],
+linkd:["ISLRTC dictionary ↗","ISLRTC शब्दकोश ↗"],linkn:["NCERT ISL videos ↗","NCERT ISL वीडियो ↗"],
+reply_h:["Reply to the signer","इशारा करने वाले को जवाब दें"],reply_lbl:["Type or speak. The reply shows in large text.","लिखें या बोलें। जवाब बड़े अक्षरों में दिखेगा।"],
+show:["Show reply","जवाब दिखाएँ"],mic:["🎤 Speak reply","🎤 बोलकर जवाब दें"],
+dict_h:["ISL word list","ISL शब्द सूची"],dict_n:["Words from the ISLRTC dictionary. Tap a word to teach or test it.","ISLRTC शब्दकोश के शब्द। सिखाने या जाँचने के लिए शब्द दबाएँ।"],dq:["Search words","शब्द खोजें"],
+big:["A+ Text","A+ अक्षर"],spkOn:["🔊 Voice on","🔊 आवाज़ चालू"],spkOff:["🔇 Voice off","🔇 आवाज़ बंद"],pOn:["Live","चालू"],pOff:["Off","बंद"],
+det:["Detected: ","पहचाना: "],nohand:["No hand in view","कोई हाथ नहीं दिख रहा"],
+needCam:["Start the camera first, then record.","पहले कैमरा चालू करें, फिर रिकॉर्ड करें।"],
+getready:["Get ready. Recording starts after the count.","तैयार हो जाएँ। गिनती के बाद रिकॉर्डिंग शुरू होगी।"],
+recDone:["Saved recording {n} for “{w}”. Record it again from a slightly different position for best accuracy.","“{w}” की रिकॉर्डिंग {n} सेव हुई। बेहतर सटीकता के लिए थोड़ी अलग जगह से फिर रिकॉर्ड करें।"],
+recFail:["No hand was seen while recording. Keep your hands in the frame and try again.","रिकॉर्डिंग के समय कोई हाथ नहीं दिखा। हाथ फ्रेम में रखें और फिर कोशिश करें।"],
+stNone:["Not taught yet","अभी सिखाया नहीं"],stStart:["Starter rule: counting fingers","शुरुआती नियम: उँगलियाँ गिनना"],stN:["{n} recording(s)","{n} रिकॉर्डिंग"],
+mstat:["{w} words taught · {n} recordings · saved in this browser","{w} शब्द सिखाए गए · {n} रिकॉर्डिंग · इसी ब्राउज़र में सेव"],
+saveFail:["Could not save in this browser (storage full). Use Export to keep your signs.","इस ब्राउज़र में सेव नहीं हो सका (जगह भरी है)। इशारे बचाने के लिए निर्यात करें।"],
+imported:["Imported {n} recordings.","{n} रिकॉर्डिंग आयात हुईं।"],badfile:["That file is not a SignSetu model.","यह फ़ाइल SignSetu मॉडल नहीं है।"],
+sure:["Delete every recording you have made?","आपकी बनाई सभी रिकॉर्डिंग हटा दें?"],
+loadFail:["Hand tracking library did not load. Check your internet connection and reload.","हाथ पहचानने वाली लाइब्रेरी लोड नहीं हुई। इंटरनेट जाँचें और पेज दोबारा खोलें।"],
+camFail:["Could not start the camera. Allow camera access, and open this page from localhost or https.","कैमरा चालू नहीं हो सका। कैमरे की अनुमति दें और पेज localhost या https से खोलें।"],
+camOn:["Camera on. Sign one word, hold it for about a second, then pause.","कैमरा चालू है। एक शब्द का इशारा करें, लगभग एक सेकंड रुकें, फिर ठहरें।"],
+};
+let lang="en",scen="hospital",voice=true,speakMode="sentence",last=null,selW="namaste",tr=[],spoken=0,sentT=null;
+const tt=(k,o)=>{let s=S[k][lang==="hi"?1:0];if(o)for(const x in o)s=s.replace("{"+x+"}",o[x]);return s};
+
+/* ---------- Saved signs (this browser) ---------- */
+const KEY="signsetu.isl.v1",QS=16;
+function enc(a){const u=new Uint8Array(a.length);for(let i=0;i<a.length;i++)u[i]=clip(Math.round(a[i]*QS),-127,127)&255;let s="";for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)}
+function dec(b){const s=atob(b),a=new Float32Array(s.length);for(let i=0;i<s.length;i++){let x=s.charCodeAt(i);if(x>127)x-=256;a[i]=x/QS}return a}
+function pack(){return JSON.stringify({app:"signsetu",v:1,nf:NF,d:D,s:DB.filter(x=>!x.p).map(x=>[x.l,x.r,enc(x.d)])})}
+function save(){try{localStorage.setItem(KEY,pack());return true}catch(e){msg(tt("saveFail"),1);return false}}
+function ingest(j,prefix,pre){
+  if(!j||j.app!=="signsetu"||j.nf!==NF||j.d!==D||!Array.isArray(j.s))return 0;
+  let n=0;j.s.forEach(r=>{if(WI[r[0]]){DB.push({l:r[0],r:prefix+r[1],d:dec(r[2]),p:!!pre});n++}});
+  return n;
+}
+function loadSaved(){try{const s=localStorage.getItem(KEY);if(s)ingest(JSON.parse(s),"s",false)}catch(e){}calcTol()}
+loadSaved();
+/* Optional: put a trained "isl_model.json" (from Export) next to this page and it loads automatically. */
+fetch("isl_model.json").then(r=>r.ok?r.json():null).then(j=>{if(j&&ingest(j,"p",true)){calcTol();refreshAll()}}).catch(()=>{});
+
+/* ---------- Speech output ---------- */
+const syn=window.speechSynthesis,voiceBy={en:"",hi:""};
+function pickVoice(l){
+  if(!syn)return null;
+  const vs=syn.getVoices(),sel=voiceBy[l]||"",ch=vs.find(v=>v.name===sel);
+  if(ch&&ch.lang.toLowerCase().startsWith(l))return ch;
+  return vs.find(v=>v.lang.toLowerCase().startsWith(l==="hi"?"hi":"en-in"))||vs.find(v=>v.lang.toLowerCase().startsWith(l))||null;
+}
+function speak(text,l){
+  if(!voice||!syn||!text)return;
+  syn.cancel();
+  const u=new SpeechSynthesisUtterance(text),pv=pickVoice(l);
+  if(pv){u.voice=pv;u.lang=pv.lang}else u.lang=l==="hi"?"hi-IN":"en-IN";
+  u.rate=+$("tRate").value;u.pitch=+$("tPitch").value;
+  u.onstart=()=>$("disp").classList.add("speaking");u.onend=u.onerror=()=>$("disp").classList.remove("speaking");
+  syn.speak(u);
+}
+/* Counter sentences: signed words (order ignored; I / want / please are fillers) become one natural sentence. */
+const FILL=new Set(["i","want","please"]);
+const REC=[
+[["emergency", "doctor"], "Emergency. I need a doctor.", "आपातकाल है। मुझे डॉक्टर चाहिए।"],
+[["emergency", "help"], "Emergency. Please help.", "आपातकाल है। कृपया मदद कीजिए।"],
+[["emergency"], "Emergency. Please help.", "आपातकाल है। कृपया मदद कीजिए।"],
+[["pain", "doctor", "help"], "I am in pain. I need a doctor.", "मुझे दर्द हो रहा है। मुझे डॉक्टर चाहिए।"],
+[["pain", "doctor"], "I am in pain. I need a doctor.", "मुझे दर्द हो रहा है। मुझे डॉक्टर चाहिए।"],
+[["pain", "medicine"], "I am in pain. I need medicine.", "मुझे दर्द हो रहा है। मुझे दवाई चाहिए।"],
+[["pain", "help"], "I am in pain. Please help.", "मुझे दर्द हो रहा है। कृपया मदद कीजिए।"],
+[["pain"], "I am in pain.", "मुझे दर्द हो रहा है।"],
+[["where", "washroom"], "Where is the washroom?", "शौचालय कहाँ है?"],
+[["where", "doctor"], "Where is the doctor?", "डॉक्टर कहाँ हैं?"],
+[["doctor", "help"], "I need a doctor.", "मुझे डॉक्टर चाहिए।"],
+[["doctor"], "I need a doctor.", "मुझे डॉक्टर चाहिए।", ["want"]],
+[["medicine", "help"], "I need medicine.", "मुझे दवाई चाहिए।"],
+[["medicine"], "I need medicine.", "मुझे दवाई चाहिए।", ["want"]],
+[["account", "help"], "I need help with my account.", "मुझे अपने खाते में मदद चाहिए।"],
+[["money", "account", "help"], "I need help with my account.", "मुझे अपने खाते में मदद चाहिए।"],
+[["form", "help"], "I need help with this form.", "मुझे इस फ़ॉर्म में मदद चाहिए।"],
+[["water"], "I need water, please.", "कृपया मुझे पानी चाहिए।", ["want", "please"]],
+[["help"], "Please help.", "कृपया मदद कीजिए।"],
+[["wait"], "Please wait.", "कृपया रुकिए।"],
+[["namaste"], "Hello.", "नमस्ते।"],
+[["thanks"], "Thank you.", "धन्यवाद।"]];  // [core words, English, Hindi, fillers needed (any one)]
+const REC_MAP={};REC.forEach(r=>REC_MAP[r[0].slice().sort().join()]=r);
+function smart(ids){                          // one sentence, or null if no counter sentence fits
+  const r=REC_MAP[[...new Set(ids.filter(x=>!FILL.has(x)))].sort().join()];
+  if(!r||(r[3]&&!r[3].some(f=>ids.includes(f))))return null;
+  return r[lang==="hi"?2:1];
+}
+const sentence=ids=>smart(ids)||ids.map(i=>WI[i][lang]).join(" ")+(lang==="hi"?"।":".");
+const best=()=>sentence(tr);
+
+
+/* ---------- A sign was recognised ---------- */
+function commit(id,conf){
+  last=id;const w=WI[id];
+  $("txt").textContent=w[lang];$("hi").textContent=w[lang==="en"?"hi":"en"];
+  $("conf").style.width=Math.round((conf||1)*100)+"%";
+  tr.push(id);if(tr.length>60){tr.shift();spoken=Math.max(0,spoken-1)}
+  renderTr();showLast(id);markDict();
+  if(speakMode==="word"){speak(w[lang],lang);spoken=tr.length}
+  else{clearTimeout(sentT);sentT=setTimeout(flush,2600)}
+}
+function flush(){if(tr.length>spoken){speak(sentence(tr),lang);spoken=tr.length}}
+function showLast(id){
+  const w=WI[id];$("fe").textContent=CAT[w.cat][0];$("fn").textContent=CAT[w.cat][lang==="hi"?2:1];$("ftx").textContent=w[lang];
+  $("fs").classList.add("hot");setTimeout(()=>$("fs").classList.remove("hot"),1200);
+}
+function renderTr(){
+  const el=$("tr");el.textContent="";
+  if(!tr.length){const p=document.createElement("span");p.className="mute";p.textContent=tt("tr_empty");el.appendChild(p);return}
+  tr.forEach((id,i)=>{const sp=document.createElement("span");sp.className="wd"+(i===tr.length-1?" cur":"");sp.textContent=WI[id][lang];el.appendChild(sp)});
+}
+function resetDisplay(){last=null;$("txt").textContent=tt("wait");$("hi").textContent="";$("conf").style.width="0";markDict()}
+
+/* ---------- Recognition loop ---------- */
+let evalN=0,votes=[],lock=null,lockT=0,lastHand=0,ruleId=null,ruleN=0,rec=null;
+function recog(hs,t){
+  let said=false;
+  if(++evalN%3===0&&buf.length>=8&&t-buf[0].t>=400){
+    const r=classify(seqAt(t,WIN));
+    votes.push(r&&r.ok?r.l:null);if(votes.length>12)votes.shift();
+    const cnt={};votes.forEach(l=>{if(l)cnt[l]=(cnt[l]||0)+1});
+    const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]),p=top[0];
+    if(DB.length){$("hold").style.width=p?Math.min(100,p[1]/4*100)+"%":"0";$("badge").textContent=tt("det")+(p?WI[p[0]][lang]:"–")}
+    if(p&&p[1]>=4&&!(top[1]&&top[1][1]>=3)&&(lock!==p[0]||t-lockT>2500)){
+      commit(p[0],r&&r.l===p[0]?Math.max(r.conf,.5):.7);lock=p[0];lockT=t;votes=[];said=true;
+    }
+  }
+  if(!said)ruleCheck(hs,t);
+}
+function ruleSign(lm){                       // finger-counting starters for numbers 1-5 (upright hand)
+  if(lm[0].y<lm[9].y)return null;
+  const up=(a,b)=>lm[a].y<lm[b].y,f=[up(8,6),up(12,10),up(16,14),up(20,18)];
+  const d=(a,b)=>Math.hypot(lm[a].x-lm[b].x,lm[a].y-lm[b].y);
+  const th=d(4,17)>d(3,17)*1.1,n=f.filter(Boolean).length;
+  if(n===4)return th?"five":"four";
+  if(n===3&&f[0]&&f[1]&&f[2])return"three";
+  if(n===2&&f[0]&&f[1])return"two";
+  if(n===1&&f[0])return"one";
+  return null;
+}
+function ruleCheck(hs,t){
+  if(hs.length!==1){ruleId=null;ruleN=0;return}
+  const id=ruleSign(hs[0]);
+  if(!id||!WI[id]||DB.some(x=>x.l===id)){ruleId=null;ruleN=0;return}
+  if(id===ruleId)ruleN++;else{ruleId=id;ruleN=1}
+  const recent=buf.filter(f=>t-f.t<500);let mv=0;
+  recent.forEach(f=>{mv=Math.max(mv,Math.hypot(f.x-recent[0].x,f.y-recent[0].y)/f.s)});
+  $("hold").style.width=Math.min(100,ruleN/14*100)+"%";
+  $("badge").textContent=tt("det")+WI[id][lang];
+  if(ruleN>=14&&mv<.8&&(lock!==id||t-lockT>2500)){commit(id,.7);lock=id;lockT=t;ruleN=0}
+}
+
+/* ---------- Teaching: record a sign ---------- */
+const nRec=l=>recIds(l).size;
+function startRec(){
+  if(!cam){msg(tt("needCam"),1);return}
+  if(rec)return;
+  rec={id:selW};votes=[];msg(tt("getready"));
+  let n=3;
+  const tick=()=>{
+    if(n>0){$("cd").textContent=n;$("cd").hidden=false;n--;setTimeout(tick,1000)}
+    else{$("cd").hidden=true;$("rb").hidden=false;rec.t0=performance.now();setTimeout(finishRec,CAP+80)}
+  };
+  tick();
+}
+function finishRec(){
+  $("rb").hidden=true;
+  const id=rec.id,t0=rec.t0,frames=buf.filter(f=>f.t>=t0).length;
+  rec=null;
+  if(frames<8){msg(tt("recFail"),1);return}
+  const rid="r"+Date.now();
+  [WIN,2000,CAP].forEach(off=>{const q=seqAt(t0+off,WIN);if(q)DB.push({l:id,r:rid,d:q})});
+  calcTol();save();lock=id;lockT=performance.now();
+  const n=nRec(id);
+  msg(tt("recDone",{n:n,w:WI[id][lang]}));
+  refreshAll();
+  if($("auto").checked&&n>=3)stepWord(1);
+}
+function stepWord(d){
+  const q=$("dq").value.trim().toLowerCase(),list=W.map(a=>WI[a[0]]).filter(w=>vis(w,q));
+  if(!list.length)return;
+  let i=list.findIndex(w=>w.id===selW);i=(i+d+list.length)%list.length;selectWord(list[i].id);
+}
+function selectWord(id){selW=id;renderDict();renderTeach();const r=document.querySelector('#dict .dr[data-k="'+id+'"]');if(r)r.scrollIntoView({block:"nearest"})}
+function renderTeach(){
+  const w=WI[selW],n=nRec(selW);
+  $("twn").textContent=w[lang];
+  $("twm").textContent=w[lang==="en"?"hi":"en"]+" · "+CAT[w.cat][lang==="hi"?2:1];
+  const d=$("dots");d.textContent="";for(let i=0;i<3;i++){const x=document.createElement("i");if(i<n)x.className="f";d.appendChild(x)}
+  $("tws").textContent=n?tt("stN",{n:n}):STARTER.has(selW)?tt("stStart"):tt("stNone");
+  const words=new Set(DB.map(x=>x.l)).size,recs=new Set(DB.map(x=>x.r)).size;
+  $("mstat").textContent=tt("mstat",{w:words,n:recs});
+}
+$("rec").onclick=startRec;
+$("tryw").onclick=()=>commit(selW,1);
+$("delw").onclick=()=>{DB=DB.filter(x=>x.l!==selW);calcTol();save();refreshAll()};
+$("pw").onclick=()=>stepWord(-1);$("nw").onclick=()=>stepWord(1);
+$("exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([pack()],{type:"application/json"}));a.download="signsetu-isl-model.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+$("imp").onclick=()=>$("impf").click();
+$("impf").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  f.text().then(s=>{const n=ingest(JSON.parse(s),"i"+Date.now(),false);if(!n){msg(tt("badfile"),1);return}calcTol();save();refreshAll();msg(tt("imported",{n:n}))}).catch(()=>msg(tt("badfile"),1));
+  e.target.value="";
+};
+$("rst").onclick=()=>{if(confirm(tt("sure"))){DB=DB.filter(x=>x.p);calcTol();save();refreshAll()}};
+
+/* ---------- Word list (right panel) ---------- */
+function vis(w,q){if(q)return(w.en+" "+w.hi).toLowerCase().includes(q);return w.cat==="g"||w.cat==="n"||w.cat===SC[scen]}
+function renderDict(){
+  const box=$("dict"),q=$("dq").value.trim().toLowerCase();box.textContent="";
+  $("dsc").textContent=q?"🔍":SCN[scen][lang==="hi"?1:0];
+  W.forEach(a=>{
+    const w=WI[a[0]];if(!vis(w,q))return;
+    const c=nRec(w.id),r=document.createElement("button");r.type="button";r.dataset.k=w.id;
+    r.className="dr"+(w.id===selW?" sel":"")+(w.id===last?" on":"");
+    const e=document.createElement("span");e.className="e";e.textContent=CAT[w.cat][0];
+    const x=document.createElement("span");x.className="t";
+    const m=document.createElement("span");m.className="m";m.textContent=w[lang];
+    const o=document.createElement("small");o.textContent=w[lang==="en"?"hi":"en"];
+    const s=document.createElement("b");s.className="st "+(c?"ok":STARTER.has(w.id)?"sr":"");s.textContent=c?"✓ "+c:STARTER.has(w.id)?"★":"–";
+    x.append(m,o);r.append(e,x,s);r.onclick=()=>selectWord(w.id);box.appendChild(r);
+  });
+}
+function markDict(){document.querySelectorAll("#dict .dr").forEach(r=>r.classList.toggle("on",r.dataset.k===last))}
+$("dq").oninput=renderDict;
+
+/* ---------- Page wiring ---------- */
+function applyUI(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll("[data-t]").forEach(e=>e.textContent=tt(e.dataset.t));
+  document.querySelectorAll("[data-tp]").forEach(e=>e.placeholder=tt(e.dataset.tp));
+  $("spk").textContent=tt(voice?"spkOn":"spkOff");
+  $("pt").textContent=tt($("pill").classList.contains("on")?"pOn":"pOff");
+  $("tPause").textContent=tt(syn&&syn.paused?"resume":"pause");
+}
+function refreshAll(){applyUI();renderTr();renderDict();renderTeach();
+  if(last){const w=WI[last];$("txt").textContent=w[lang];$("hi").textContent=w[lang==="en"?"hi":"en"];showLast(last)}else{$("txt").textContent=tt("wait");$("fn").textContent=tt("nosign")}}
+function setLang(l){lang=l;$("lEn").setAttribute("aria-pressed",l==="en");$("lHi").setAttribute("aria-pressed",l==="hi");refreshAll()}
+$("lEn").onclick=()=>setLang("en");$("lHi").onclick=()=>setLang("hi");
+document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+  scen=b.dataset.s;document.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  renderDict();
+});
+$("spk").onclick=e=>{voice=!voice;e.currentTarget.setAttribute("aria-pressed",voice);$("spk").textContent=tt(voice?"spkOn":"spkOff");if(!voice&&syn)syn.cancel()};
+$("big").onclick=e=>{const on=e.currentTarget.getAttribute("aria-pressed")!=="true";e.currentTarget.setAttribute("aria-pressed",on);document.documentElement.style.fontSize=on?"125%":"100%"};
+$("say").onclick=()=>{if(last)speak(WI[last][lang],lang)};
+$("clr").onclick=resetDisplay;
+function setMode(m){speakMode=m;$("mS").setAttribute("aria-pressed",m==="sentence");$("mW").setAttribute("aria-pressed",m==="word")}
+$("mS").onclick=()=>setMode("sentence");$("mW").onclick=()=>setMode("word");
+$("spS").onclick=()=>{clearTimeout(sentT);if(tr.length){speak(best(),lang);spoken=tr.length}};
+$("undo").onclick=()=>{tr.pop();spoken=Math.min(spoken,tr.length);renderTr();const l=tr[tr.length-1];if(l)showLast(l);else{$("ftx").textContent="…";$("fe").textContent="✋";$("fn").textContent=tt("nosign")}};
+$("trc").onclick=()=>{clearTimeout(sentT);tr=[];spoken=0;renderTr();$("ftx").textContent="…";$("fe").textContent="✋";$("fn").textContent=tt("nosign")};
+$("cp").onclick=async()=>{try{await navigator.clipboard.writeText(best());$("cp").textContent=tt("cpd");setTimeout(()=>$("cp").textContent=tt("cp"),1500)}catch(e){$("cp").textContent="Copy failed"}};
+function pill(on){$("pill").classList.toggle("on",on);$("pt").textContent=tt(on?"pOn":"pOff")}
+function msg(t,bad){$("msg").textContent=t;$("msg").className=bad?"note err":"note"}
+
+/* ---------- Text to speech panel ---------- */
+function fillVoices(){
+  if(!syn)return;const sel=$("tVoice"),cur=sel.value;sel.length=1;
+  syn.getVoices().filter(v=>/^(en|hi)/i.test(v.lang)).forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name+" ("+v.lang+")";sel.appendChild(o)});
+  sel.value=cur;renderGallery();
+  $("vNote").textContent=syn.getVoices().some(v=>/^hi/i.test(v.lang))?"":"No Hindi voice found on this device. Install one in your system settings.";
+}
+if(syn){fillVoices();syn.onvoiceschanged=fillVoices}else{$("tSt").textContent="Speech is not supported in this browser"}
+function tSpeak(text,forceLang){
+  if(!syn)return;text=text.trim();
+  if(!text){$("tSt").textContent="Type some text first";return}
+  syn.cancel();
+  const u=new SpeechSynthesisUtterance(text),gl=forceLang||(/[\u0900-\u097F]/.test(text)?"hi":"en"),v=pickVoice(gl);
+  if(v){u.voice=v;u.lang=v.lang}else u.lang=gl==="hi"?"hi-IN":"en-IN";
+  u.rate=+$("tRate").value;u.pitch=+$("tPitch").value;
+  u.onstart=()=>{$("ttsCard").classList.add("speaking");$("tSt").textContent="Speaking…"};
+  u.onend=()=>{$("ttsCard").classList.remove("speaking");$("tSt").textContent="Done"};
+  u.onerror=()=>{$("ttsCard").classList.remove("speaking");$("tSt").textContent="Could not speak this text"};
+  syn.speak(u);
+}
+$("tSay").onclick=()=>tSpeak($("ttsIn").value);
+$("tTr").onclick=()=>{const s=best();if(s)$("ttsIn").value=s;tSpeak(s)};
+$("tStop").onclick=()=>{if(syn){syn.cancel();$("ttsCard").classList.remove("speaking");$("tSt").textContent="Stopped"}};
+$("tPause").onclick=e=>{if(!syn)return;if(syn.paused){syn.resume();e.currentTarget.textContent=tt("pause");$("tSt").textContent="Speaking…"}else if(syn.speaking){syn.pause();e.currentTarget.textContent=tt("resume");$("tSt").textContent="Paused"}};
+$("tRate").oninput=e=>$("rO").textContent=(+e.target.value).toFixed(1)+"×";
+$("tPitch").oninput=e=>$("pO").textContent=(+e.target.value).toFixed(1);
+["Please wait a moment.","Please take a seat.","Please fill in this form.","Your turn is next.","Do you need an interpreter?","Thank you for waiting."].forEach(s=>{
+  const b=document.createElement("button");b.type="button";b.textContent=s;b.onclick=()=>{$("ttsIn").value=s;tSpeak(s)};$("qp").appendChild(b);
+});
+document.querySelectorAll("#vs button").forEach(b=>b.onclick=()=>{
+  $("tRate").value=b.dataset.r;$("tPitch").value=b.dataset.p;
+  $("rO").textContent=(+b.dataset.r).toFixed(1)+"×";$("pO").textContent=(+b.dataset.p).toFixed(1);
+  tSpeak($("ttsIn").value||(lang==="hi"?"नमस्ते, मैं आपकी मदद के लिए हूँ।":"Hello, I am here to help."));
+});
+function renderGallery(){
+  if(!syn)return;const vs=syn.getVoices();
+  [["hi","vgHi"],["en","vgEn"]].forEach(([g,id])=>{
+    const box=$(id);box.textContent="";
+    const list=vs.filter(v=>g==="hi"?/^hi/i.test(v.lang):/^en/i.test(v.lang));
+    if(!list.length){const p=document.createElement("p");p.className="note";p.textContent=g==="hi"?"No Hindi voice on this device. Install one in your system settings.":"No English voice found.";box.appendChild(p);return}
+    list.forEach(v=>{
+      const c=document.createElement("div");c.className="vc"+(voiceBy[g]===v.name?" sel":"");
+      const b=document.createElement("b");b.textContent=v.name;
+      const sm=document.createElement("small");sm.textContent=v.lang+(v.localService?" · works offline":" · online");
+      const r=document.createElement("div");r.className="r";
+      const pv=document.createElement("button");pv.type="button";pv.textContent="▶ Preview";
+      pv.onclick=()=>{syn.cancel();const u=new SpeechSynthesisUtterance(g==="hi"?"नमस्ते, मैं आपकी मदद के लिए हूँ।":"Hello, I am here to help.");u.voice=v;u.lang=v.lang;u.rate=+$("tRate").value;u.pitch=+$("tPitch").value;syn.speak(u)};
+      const us=document.createElement("button");us.type="button";us.className="u";us.textContent=voiceBy[g]===v.name?"✓ In use":"Use";
+      us.onclick=()=>{voiceBy[g]=v.name;renderGallery();$("tSt").textContent=(g==="hi"?"Hindi":"English")+" voice: "+v.name};
+      r.append(pv,us);c.append(b,sm,r);box.appendChild(c);
+    });
+  });
+}
+$("tVoice").onchange=e=>{const v=syn&&syn.getVoices().find(x=>x.name===e.target.value);if(v){voiceBy[/^hi/i.test(v.lang)?"hi":"en"]=v.name;renderGallery()}};
+$("tHi").onclick=()=>tSpeak($("ttsIn").value||"नमस्ते, मैं आपकी मदद के लिए हूँ।","hi");
+$("tEn").onclick=()=>tSpeak($("ttsIn").value||"Hello, I am here to help.","en");
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR){$("tMic").disabled=true;$("mic").disabled=true}
+else{
+  $("tMic").onclick=()=>{const r=new SR();r.lang=lang==="hi"?"hi-IN":"en-IN";$("tSt").textContent="Listening…";
+    r.onresult=e=>{$("ttsIn").value=e.results[0][0].transcript;$("tSt").textContent="Ready"};r.onerror=()=>$("tSt").textContent="Microphone not available";r.start()};
+  $("mic").onclick=()=>{const r=new SR();r.lang=lang==="hi"?"hi-IN":"en-IN";$("mic").textContent="Listening…";
+    r.onresult=e=>{const s=e.results[0][0].transcript;$("reply").value=s;$("staff").textContent=s};r.onend=()=>$("mic").textContent=tt("mic");r.start()};
+}
+$("show").onclick=()=>{$("staff").textContent=$("reply").value.trim()};
+
+/* ---------- Camera + MediaPipe Hands (up to two hands) ---------- */
+let cam=null,hands=null;
+const v=$("v"),cv=$("c"),ctx=cv.getContext("2d");
+$("go").onclick=async()=>{
+  if(!window.Hands){msg(tt("loadFail"),1);return}
+  try{
+    hands=new Hands({locateFile:f=>"https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/"+f});
+    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.6,minTrackingConfidence:.6});
+    hands.onResults(onResults);
+    cam=new Camera(v,{onFrame:async()=>{await hands.send({image:v})},width:640,height:480});
+    await cam.start();
+    $("ph").hidden=true;$("badge").hidden=false;$("badge").textContent=tt("nohand");pill(true);$("go").disabled=true;$("stop").disabled=false;
+    msg(tt("camOn"));
+  }catch(e){cam=null;msg(tt("camFail"),1)}
+};
+$("stop").onclick=()=>{
+  if(cam)cam.stop();cam=null;rec=null;$("cd").hidden=true;$("rb").hidden=true;
+  if(v.srcObject)v.srcObject.getTracks().forEach(x=>x.stop());
+  ctx.clearRect(0,0,cv.width,cv.height);buf=[];votes=[];
+  $("ph").hidden=false;$("badge").hidden=true;pill(false);$("hold").style.width="0";$("go").disabled=false;$("stop").disabled=true;msg("");
+};
+function onResults(r){
+  cv.width=r.image.width;cv.height=r.image.height;ctx.clearRect(0,0,cv.width,cv.height);
+  const L=(r.multiHandLandmarks||[]).slice(0,2),now=performance.now();
+  if(!L.length){
+    if(!rec)$("badge").textContent=tt("nohand");
+    if(now-lastHand>500){lock=null;votes=[];ruleId=null;ruleN=0;$("hold").style.width="0"}
+    return;
+  }
+  lastHand=now;
+  L.forEach(lm=>{drawConnectors(ctx,lm,HAND_CONNECTIONS,{color:"#FFD23F",lineWidth:3});drawLandmarks(ctx,lm,{color:"#0B6E78",lineWidth:1,radius:3})});
+  const hs=L.slice().sort((a,b)=>a[0].x-b[0].x);
+  pushFrame(hs,now);
+  if(rec)return;                              // never recognise while recording a new sign
+  recog(hs,now);
+}
+
+setMode("sentence");
+refreshAll();
+</script>
+</body>
+</html>
